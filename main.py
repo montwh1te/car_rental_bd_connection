@@ -1,14 +1,8 @@
-from sqlalchemy import create_engine, Column, Integer, String, Numeric
-from sqlalchemy.orm import sessionmaker, declarative_base
+from database import session, Base, engine
+from sqlalchemy import Column, Integer, String, Numeric
 from rental_architecture import Rental
 from datetime import datetime, timedelta
-
-DATABASE_URL ="mysql+mysqlconnector://root:@localhost/car_db"
-
-engine = create_engine(DATABASE_URL)
-Session = sessionmaker(bind=engine)
-session = Session()
-Base = declarative_base()
+from sqlalchemy.orm.exc import NoResultFound
 
 
 # Definição do modelo
@@ -23,13 +17,15 @@ class Vehicle(Base):
     valor_diaria = Column(Numeric(10, 2), nullable=False)
 
 
+# inserção de um veículo na tabela Vehicle do banco de dados
 def insert_Vehicle(marca, modelo, placa, ano, valor_diaria):
-    new_vehicle = Vehicle(marca=marca,  modelo=modelo, placa=placa, ano=ano, valor_diaria=valor_diaria)
+    new_vehicle = Vehicle(marca=marca, modelo=modelo, placa=placa, ano=ano, valor_diaria=valor_diaria)
     session.add(new_vehicle)
     session.commit()
     print(f'Veículo {marca} {modelo} adicionado com sucesso!')
 
 
+# atualização de um veículo na tabela Vehicle do banco de dados
 def update_Vehicle(placa, new_marca, new_modelo, new_ano, new_valor_diaria):
     vehicle = session.query(Vehicle).filter_by(placa=placa).first()
     if vehicle:
@@ -43,6 +39,7 @@ def update_Vehicle(placa, new_marca, new_modelo, new_ano, new_valor_diaria):
         print(f'Veículo com placa {placa} não encontrado.')
 
 
+# deleção de um veículo na tabela Vehicle do banco de dados
 def delete_Vehicle(placa):
     vehicle = session.query(Vehicle).filter_by(placa=placa).first()
     if vehicle:
@@ -53,20 +50,85 @@ def delete_Vehicle(placa):
         print(f'Veículo com placa {placa} não encontrado.')
 
 
+# lista dos veículos na tabela Vehicle do banco de dados
 def list_Vehicles():
     all_vehicles = session.query(Vehicle).all()
     if all_vehicles:
         for vehicle in all_vehicles:
-            print(f'ID: {vehicle.id}, Marca: {vehicle.marca}, Modelo: {vehicle.modelo}, Placa: {vehicle.placa}, Ano: {vehicle.ano}, Valor Diária: {vehicle.valor_diaria}')
+            print(
+                f'ID: {vehicle.id}, Marca: {vehicle.marca}, Modelo: {vehicle.modelo}, Placa: {vehicle.placa}, Ano: {vehicle.ano}, Valor Diária: {vehicle.valor_diaria}')
     else:
         print('Nenhum veículo encontrado.')
 
 
-def rental_Car():
-    pass
+# ação que atribui um determinado carro a um aluguel
+def rental_Car(data_alugar, placa_carro):
+    # query pela placa
+    carro_selecionado = session.query(Vehicle).filter_by(placa=placa_carro).first()
+    id_veiculo = carro_selecionado.id
 
-def return_Car():
-    pass
+    # verificação se a query foi realizada corretamente e se o veículo existe.
+    if not carro_selecionado:
+        print(f'Veículo com placa {placa_carro} não encontrado.')
+        return
+
+    # verificação se o veículo já foi alocado.
+    try:
+        session.query(Rental).filter_by(id_veiculo=id_veiculo, status='alugado').one()
+        print('Este veículo já está alugado!')
+        return
+    except NoResultFound:
+        # nenhum locação encontrada, continuar...
+        pass
+
+    # verificação da variável "data_alugar" em formato datetime para operação da previsão de entrega.
+    if isinstance(data_alugar, str):
+        data_alugar = datetime.strptime(data_alugar, '%d/%m/%Y')
+    previsao_entrega = data_alugar + timedelta(days=3)
+
+    # instanciando o novo aluguel
+    new_rental = Rental(data_previsao_retorno=previsao_entrega, data_alugar=data_alugar, id_veiculo=id_veiculo,
+                        status='alugado')
+
+    # adicionando novo aluguel ao database
+    if new_rental:
+        session.add(new_rental)
+        session.commit()
+        print(f'O {carro_selecionado.marca} {carro_selecionado.modelo} foi alugado com sucesso!')
+
+
+# ação que atribui um determinado carro a uma devolução de um aluguel
+def return_Car(data_devolucao, placa_carro):
+    carro_selecionado = session.query(Vehicle).filter_by(placa=placa_carro).first()
+
+    # verificação se a query foi realizada corretamente e se o veículo existe.
+    if not carro_selecionado:
+        print(f'Veículo com placa {placa_carro} não encontrado.')
+        return
+
+    # verificação se o veículo já foi devolvido.
+    locacao_existente = session.query(Rental).filter_by(id_veiculo=carro_selecionado.id).first()
+    if not locacao_existente:
+        print('Este veículo já foi devolvido!')
+        return
+
+    # filtro na tabela Rental para obter informações das datas
+    stats_aluguel = session.query(Rental).filter_by(id_veiculo=carro_selecionado.id).first()
+
+    # verificação de type: str para type: datetime, para que a operação de diferença de data seja bem sucedida
+    data_retorno = stats_aluguel.data_previsao_retorno
+    if isinstance(data_devolucao, str):
+        data_devolucao = datetime.strptime(data_devolucao, '%d/%m/%Y')
+
+    # operação de diferença de data, se diferença menor que 0, então veículo foi entregue dentro do prazo, caso contrário, será informado em quantos dias a devolução foi atrasada.
+    diff_data_aluguel = data_devolucao - data_retorno
+    if diff_data_aluguel.days <= 0:
+        print('Veículo entregue dentro do prazo!')
+    else:
+        print(f'A sua entrega atrasou {diff_data_aluguel.days} dias.')
+
+    session.delete(stats_aluguel)
+    session.commit()
 
 
 def main():
@@ -76,7 +138,9 @@ def main():
         print("2. Atualizar veículo")
         print("3. Deletar veículo")
         print("4. Listar veículos")
-        print("5. Sair")
+        print("5. Alugar veículo")
+        print("6. Devolver veículo")
+        print("7. Sair")
 
         choice = input("Opção: ")
 
@@ -102,6 +166,16 @@ def main():
         elif choice == '4':
             list_Vehicles()
         elif choice == '5':
+            list_Vehicles()
+            placa_carro = str(input('Placa do veículo que será alugado: '))
+            data_alugar = str(input('Data em que o veículo será alugado (d/m/y): '))
+            rental_Car(data_alugar, placa_carro)
+        elif choice == '6':
+            list_Vehicles()
+            placa_carro = str(input('Placa do veículo que será devolvido: '))
+            data_dev = str(input('Data em que o veículo será devolvido (d/m/y): '))
+            return_Car(data_dev, placa_carro)
+        elif choice == '7':
             print("Saindo...")
             break
         else:
@@ -109,7 +183,6 @@ def main():
 
 
 if __name__ == "__main__":
-    Base.metadata.create_all(engine)
-    main()
-    session.close()
-
+    Base.metadata.create_all(engine)  # cria-se a engine do bd
+    main()  # chama o menu principal
+    session.close()  # fecha a sessão do bd enquanto o programa não está em execução
