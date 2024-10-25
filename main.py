@@ -20,7 +20,8 @@ class Vehicle(Base):
 
 # inserção de um veículo na tabela Vehicle do banco de dados
 def insert_Vehicle(marca, modelo, placa, ano, valor_diaria):
-    new_vehicle = Vehicle(marca=marca, modelo=modelo, placa=placa, ano=ano, valor_diaria=valor_diaria)
+    new_vehicle = Vehicle(marca=marca.lower(), modelo=modelo.lower(), placa=placa.upper(), ano=ano,
+                          valor_diaria=valor_diaria)
     session.add(new_vehicle)
     session.commit()
     print(f'Veículo {marca} {modelo} adicionado com sucesso!')
@@ -28,10 +29,10 @@ def insert_Vehicle(marca, modelo, placa, ano, valor_diaria):
 
 # atualização de um veículo na tabela Vehicle do banco de dados
 def update_Vehicle(placa, new_marca, new_modelo, new_ano, new_valor_diaria):
-    vehicle = session.query(Vehicle).filter_by(placa=placa).first()
+    vehicle = session.query(Vehicle).filter_by(placa=placa.upper()).first()
     if vehicle:
-        vehicle.marca = new_marca
-        vehicle.modelo = new_modelo
+        vehicle.marca = new_marca.lower()
+        vehicle.modelo = new_modelo.lower()
         vehicle.ano = new_ano
         vehicle.valor_diaria = new_valor_diaria
         session.commit()
@@ -42,7 +43,7 @@ def update_Vehicle(placa, new_marca, new_modelo, new_ano, new_valor_diaria):
 
 # deleção de um veículo na tabela Vehicle do banco de dados
 def delete_Vehicle(placa):
-    vehicle = session.query(Vehicle).filter_by(placa=placa).first()
+    vehicle = session.query(Vehicle).filter_by(placa=placa.upper()).first()
     if vehicle:
         session.delete(vehicle)
         session.commit()
@@ -65,7 +66,7 @@ def list_Vehicles():
 # ação que atribui um determinado carro a um aluguel
 def rental_Car(data_alugar, placa_carro):
     # query pela placa
-    carro_selecionado = session.query(Vehicle).filter_by(placa=placa_carro).first()
+    carro_selecionado = session.query(Vehicle).filter_by(placa=placa_carro.upper()).first()
     id_veiculo = carro_selecionado.id
 
     # verificação se a query foi realizada corretamente e se o veículo existe.
@@ -75,7 +76,7 @@ def rental_Car(data_alugar, placa_carro):
 
     # verificação se o veículo já foi alocado.
     try:
-        session.query(Vehicle).filter_by(placa=placa_carro, status='alugado').one()
+        session.query(Vehicle).filter_by(placa=placa_carro.upper(), status='alugado').one()
         print('Este veículo já está alugado!')
         return
     except NoResultFound:
@@ -100,7 +101,7 @@ def rental_Car(data_alugar, placa_carro):
 
 # ação que atribui um determinado carro a uma devolução de um aluguel
 def return_Car(data_devolucao, placa_carro):
-    carro_selecionado = session.query(Vehicle).filter_by(placa=placa_carro).first()
+    carro_selecionado = session.query(Vehicle).filter_by(placa=placa_carro.upper()).first()
     id_veiculo = carro_selecionado.id
 
     # verificação se a query foi realizada corretamente e se o veículo existe.
@@ -130,8 +131,10 @@ def return_Car(data_devolucao, placa_carro):
         print(f'A sua entrega atrasou {diff_data_aluguel.days} dias.')
 
     locacao_existente.data_retorno = data_devolucao
+    locacao_existente.dias_atrasados = diff_data_aluguel.days
     carro_selecionado.status = 'disponivel'
     session.commit()
+
 
 def filter_Menu():
     print("\nEscolha uma opção:")
@@ -146,15 +149,22 @@ def filter_Menu():
     except:
         print('Informe um número do filtro de pesquisa válido:')
 
+
 def brand_Filter():
     brand_selected = str(input('Digite o nome da marca que deseja buscar: '))
     selected_cars = session.query(Vehicle).filter_by(marca=brand_selected.lower()).all()
     for car in selected_cars:
         print(
-                f'ID: {car.id}, Marca: {car.marca}, Modelo: {car.modelo}, Placa: {car.placa}, Ano: {car.ano}, Valor Diária: {car.valor_diaria}')
+            f'ID: {car.id}, Modelo: {car.modelo}, Placa: {car.placa}, Ano: {car.ano}, Valor Diária: {car.valor_diaria}')
+
 
 def disponibility_Filter():
-    pass
+    disponibles_cars = session.query(Vehicle).filter_by(status='disponivel').all()
+    print('-' * 20)
+    for car in disponibles_cars:
+        print(
+            f'Marca: {car.marca}, Modelo: {car.modelo}, Placa: {car.placa}, Ano: {car.ano}, Valor Diária: {car.valor_diaria}')
+    print('-' * 20)
 
 
 def main():

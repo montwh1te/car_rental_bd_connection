@@ -12,3 +12,4 @@ class Rental(Base):
     data_alugar = Column(DateTime, nullable=False)
     data_previsao_retorno = Column(DateTime, nullable=False)
     data_retorno = Column(DateTime, nullable=True, default=None)
+    dias_atrasados = Column(Integer, nullable=True, default=None)
