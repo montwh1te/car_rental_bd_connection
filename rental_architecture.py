@@ -1,4 +1,4 @@
-from sqlalchemy import Enum, Column, Integer, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, DateTime, ForeignKey
 from database import Base
 
 
@@ -11,4 +11,4 @@ class Rental(Base):
     id_veiculo = Column(Integer, ForeignKey('vehicle.id'), nullable=False)
     data_alugar = Column(DateTime, nullable=False)
     data_previsao_retorno = Column(DateTime, nullable=False)
-    status = Column(Enum('alugado', 'disponivel'), nullable=False)
+    data_retorno = Column(DateTime, nullable=True, default=None)
